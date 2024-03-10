@@ -6,8 +6,6 @@ using VolunteerAppSecurity.DTOs;
 using VolunteerAppSecurity.Interfaces;
 using VolunteerAppSecurity.Models;
 using MailKit.Net.Smtp;
-using Microsoft.EntityFrameworkCore;
-using VolunteerAppSecurity.DataAccess;
 
 namespace VolunteerAppSecurity.Services
 {
@@ -15,15 +13,14 @@ namespace VolunteerAppSecurity.Services
     {
             readonly UserManager<User> _userManager;
             readonly RoleManager<IdentityRole<Guid>> _roleManager;
-            private readonly SecurityDBContext _securityDBContext;
-        public UserService(UserManager<User> userManager, RoleManager<IdentityRole<Guid>> roleManager, SecurityDBContext securityDBContext)
+           
+        public UserService(UserManager<User> userManager, RoleManager<IdentityRole<Guid>> roleManager)
         {
             _userManager = userManager;
             _roleManager = roleManager;
-            _securityDBContext = securityDBContext;
         }
 
-        private Task<string> CallBackUrl(User user, string code)
+        public Task<string> CallBackUrl(User user, string code)
         {
             var ngrok = Constants.ngrok;
             var callbackUrl = ngrok + "/api/User/VerificateEmail" + $"?userId={user.Id}&code={code}";
@@ -31,7 +28,7 @@ namespace VolunteerAppSecurity.Services
             return Task.FromResult(callbackUrl);
         }
       
-        public async Task<UserDTO> CreateUser(RegisterDTO registerDTO)
+        public async Task<bool> CreateUser(RegisterDTO registerDTO)
         {
             var user = new User()
             {
@@ -44,40 +41,27 @@ namespace VolunteerAppSecurity.Services
             if (createUserResult.Succeeded)
             {
                 var foundUser = await _userManager.FindByEmailAsync(user.Email);
-                var roleResult = await AddUserRoleAsync(foundUser, registerDTO.RoleName);
+                var roleResult = await _userManager.AddToRolesAsync(foundUser, registerDTO.RoleName);
 
-                var isSentEmail = await SendEmail(foundUser);
-
-                if (!isSentEmail)
+                if (!roleResult.Succeeded)
                 {
                     await _userManager.DeleteAsync(foundUser);
                 }
 
-                return new UserDTO()
-                {
-                    UserName = foundUser.UserName,
-                    Email = foundUser.Email,
-                    RoleName = roleResult
-                };
+                return roleResult.Succeeded;
             }
             else
             {
-                throw new Exception();
+                return false;
             }
         }
 
-        public async Task<UserDTO> GetUserById(string id)
+        public async Task<User> GetUserById(string id)
         {
-            var user = await _userManager.FindByIdAsync(id);
-
-            return new UserDTO()
-            {
-                Id = user.Id,
-                Email = user.Email,
-            };
+            return await _userManager.FindByIdAsync(id);
         }
 
-        private async Task<bool> SendEmail(User user)
+        public async Task<bool> SendEmail(User user)
         {
             var emailConfirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var emailConfirmationUrl = await CallBackUrl(user, emailConfirmationToken);
@@ -236,43 +220,13 @@ namespace VolunteerAppSecurity.Services
             }
         }
 
-        public async Task<bool> UserExist(string email)
+        public async Task<bool> VerifyEmail(User user, string token)
         {
-            return await _securityDBContext.Users.AnyAsync(us => us.Email == email);
-        }
-
-        public async Task<bool> VerifyEmail(UserDTO userDTO, string token)
-        {
-            var userToVerify = new User()
-            {
-                Email = userDTO.Email,
-            };
-            var verificationResult = await _userManager.ConfirmEmailAsync(userToVerify, token);
+            var verificationResult = await _userManager.ConfirmEmailAsync(user, token);
 
             return verificationResult.Succeeded;
         }
 
-        private async Task<string> AddUserRoleAsync(User user, string roleName)
-        {
-            var isAddedUserRole = await _userManager.AddToRoleAsync(user, roleName);
-            if (isAddedUserRole.Succeeded)
-            {
-                var roles = await _userManager.GetRolesAsync(user);
-                return roles.First();
-            }
-            else
-            {
-                throw new Exception();
-            }
-        }
-
-        public async Task<bool> DeleteUser(string email)
-        {
-            var foundUser = await _userManager.FindByEmailAsync(email);
-            if (foundUser == null) return false;
-            var deletionResult = await _userManager.DeleteAsync(foundUser);
-            return deletionResult.Succeeded;
-        }
     }
 
 }

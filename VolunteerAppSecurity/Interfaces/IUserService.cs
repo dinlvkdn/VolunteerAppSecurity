@@ -1,13 +1,14 @@
 ﻿using VolunteerAppSecurity.DTOs;
+using VolunteerAppSecurity.Models;
 
 namespace VolunteerAppSecurity.Interfaces
 {
     public interface IUserService
     {
-        public Task<UserDTO> CreateUser(RegisterDTO userDTO);
-        public Task<UserDTO> GetUserById(string id);
-        Task<bool> VerifyEmail(UserDTO userDTO, string code);
-        public Task<bool> UserExist(string email);
-        public Task<bool> DeleteUser(string email);
+        public Task<bool> CreateUser(RegisterDTO userDTO);
+        public Task<User> GetUserById(string id);
+        Task<bool> VerifyEmail(User user, string code);
+        Task<string> CallBackUrl(User user, string code);
+        Task<bool> SendEmail(User user);
     }
 }
