@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VolunteerAppSecurity.DataAccess;
 
@@ -11,9 +12,11 @@ using VolunteerAppSecurity.DataAccess;
 namespace VolunteerAppSecurity.Migrations
 {
     [DbContext(typeof(SecurityDBContext))]
-    partial class SecurityDBContextModelSnapshot : ModelSnapshot
+    [Migration("20240310132017_AddedNewColumnForUser")]
+    partial class AddedNewColumnForUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

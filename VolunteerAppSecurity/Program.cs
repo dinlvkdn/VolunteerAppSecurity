@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +7,7 @@ using VolunteerAppSecurity.DataAccess;
 using VolunteerAppSecurity.Interfaces;
 using VolunteerAppSecurity.Models;
 using VolunteerAppSecurity.Services;
+using VolunteerAppSecurity.Exceptions;
 
 namespace VolunteerAppSecurity
 {
@@ -19,7 +19,10 @@ namespace VolunteerAppSecurity
 
             // Add services to the container.
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers(options =>
+            {
+                options.Filters.Add(typeof(ExceptionResponseFilter));
+            });
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
