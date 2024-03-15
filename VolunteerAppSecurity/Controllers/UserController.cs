@@ -1,26 +1,26 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using VolunteerAppSecurity.DTOs;
+using VolunteerAppSecurity.Exceptions;
 using VolunteerAppSecurity.Interfaces;
 using VolunteerAppSecurity.Models;
 using VolunteerAppSecurity.Services;
 
 namespace VolunteerAppSecurity.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class UserController : ControllerBase
     {
         readonly IUserService _userService;
         readonly ITokenGenerator _tokenGenerator;
-        readonly UserManager<User> _userManager;
 
-        public UserController(IUserService userService, ITokenGenerator tokenGenerator, UserManager<User> userManager)
-        {
+        public UserController(IUserService userService, ITokenGenerator tokenGenerator)
+        { 
             _userService = userService;
             _tokenGenerator = tokenGenerator;
-            _userManager = userManager;
         }
 
         [HttpPost]
@@ -29,11 +29,14 @@ namespace VolunteerAppSecurity.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var user = await _userManager.FindByEmailAsync(userLoginDTO.Email);
+            var user = await _userService.UserExist(userLoginDTO.Email);
+            if (!user) return NotFound("No user exists");
 
-            if (user == null) return NotFound("No user exists");
+            var checkPassword = await _userService.CheckPassword(userLoginDTO.Email, userLoginDTO.Password);
 
-            var token = await _tokenGenerator.GenerateTokens(user);
+            if (!checkPassword) return BadRequest("Incorrect password!");
+
+            var token = await _userService.GenerateTokens(userLoginDTO.Email);
 
             if (token == null)
             {
@@ -47,24 +50,25 @@ namespace VolunteerAppSecurity.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Registration([FromBody] RegisterDTO userRegisterDTO)
         {
-            try
-            {
-                if (!ModelState.IsValid) return BadRequest(ModelState);
-
-                var user = await _userManager.FindByEmailAsync(userRegisterDTO.Email);
-                var isUserExists = await _userService.UserExist(userRegisterDTO.Email);
-
-                if (isUserExists)
+            if (!ModelState.IsValid)
+                throw new ApiException()
                 {
-                    return BadRequest("A user with this email already exists");
-                }
-                var createdUser = await _userService.CreateUser(userRegisterDTO);
-                if (createdUser != null) return Created("/api/user", user);
+                    StatusCode = StatusCodes.Status404NotFound,
+                    Title = "Not found",
+                    Detail = "User doesn't exist"
+                };
 
-            }
-            catch (Exception) { }
+            var createdUser = await _userService.CreateUser(userRegisterDTO);
 
-            return StatusCode(StatusCodes.Status500InternalServerError, "Error occured while creating user on server");
+            if (createdUser != null) 
+                return Created("/api/user", createdUser);
+            else
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Title = "Server error",
+                    Detail = "Error occured while creating user on server"
+                };
         }
 
         [HttpGet]
@@ -100,6 +104,61 @@ namespace VolunteerAppSecurity.Controllers
             else
             {
                 return Content(Constants.FailureMessage, "text/html");
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpPost]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDTO refreshTokenDTO)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var result = await _tokenGenerator.RefreshAccessToken(refreshTokenDTO.AccessToken,
+                refreshTokenDTO.RefreshToken);
+
+            if (result == null) return StatusCode(StatusCodes.Status400BadRequest);
+
+            return Ok(result);
+        }
+
+        [AllowAnonymous]
+        [HttpPost("resetcode")]
+        public async Task<IActionResult> ResettingCode([FromBody] EmailDTO emailDTO)
+        {
+            var id = HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = await _userService.UserExist(emailDTO.To);
+
+            if (!user) return BadRequest("User doesn't exists");
+
+            var userGetResetCode = await _userService.GetUserById(id);
+
+            if (await _userService.SendPasswordResetToken(userGetResetCode))
+            {
+                return Ok("Reset code has sent!");
+            }
+            else
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, "Server error");
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpPost("verifyresetcode")]
+        public async Task<IActionResult> VerifyingResetCode([FromBody] ResetPasswordDTO resetPasswordDTO)
+        {
+            if (!await _userService.UserExist(resetPasswordDTO.Email))
+            {
+                return BadRequest("Invalid email or doesn't exists");
+            }
+
+            var user = await _userService.GetUserByEmail(resetPasswordDTO.Email);
+            if (await _userService.ConfirmPasswordReset(user, resetPasswordDTO.ResetCode, resetPasswordDTO.NewPassword))
+            {
+                return Ok("Password reset successfully");
+            }
+            else
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, "Server error");
             }
         }
     }
