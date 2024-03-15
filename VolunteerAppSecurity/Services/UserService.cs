@@ -6,18 +6,24 @@ using VolunteerAppSecurity.DTOs;
 using VolunteerAppSecurity.Interfaces;
 using VolunteerAppSecurity.Models;
 using MailKit.Net.Smtp;
+using Microsoft.EntityFrameworkCore;
+using VolunteerAppSecurity.DataAccess;
+using VolunteerAppSecurity.Exceptions;
 
 namespace VolunteerAppSecurity.Services
 {
     public class UserService : IUserService
     {
-            readonly UserManager<User> _userManager;
-            readonly RoleManager<IdentityRole<Guid>> _roleManager;
-           
-        public UserService(UserManager<User> userManager, RoleManager<IdentityRole<Guid>> roleManager)
+        readonly UserManager<User> _userManager;
+        readonly RoleManager<IdentityRole<Guid>> _roleManager;
+        private readonly SecurityDBContext _securityDBContext;
+        private readonly ITokenGenerator _tokenGenerator;
+        public UserService(UserManager<User> userManager, RoleManager<IdentityRole<Guid>> roleManager, SecurityDBContext securityDBContext, ITokenGenerator tokenGenerator)
         {
             _userManager = userManager;
             _roleManager = roleManager;
+            _securityDBContext = securityDBContext;
+            _tokenGenerator = tokenGenerator;
         }
 
         public Task<string> CallBackUrl(User user, string code)
@@ -30,6 +36,17 @@ namespace VolunteerAppSecurity.Services
       
         public async Task<bool> CreateUser(RegisterDTO registerDTO)
         {
+            var checkByEmail = await UserExist(registerDTO.Email);
+            if (checkByEmail) 
+            {
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Title = "User exist",
+                    Detail = "User with this email already exists"
+                };
+            }
+
             var user = new User()
             {
                 UserName = registerDTO.UserName,
@@ -43,17 +60,36 @@ namespace VolunteerAppSecurity.Services
                 var foundUser = await _userManager.FindByEmailAsync(user.Email);
                 var roleResult = await _userManager.AddToRolesAsync(foundUser, registerDTO.RoleName);
 
-                if (!roleResult.Succeeded)
+                var isSentEmail = await SendEmail(foundUser);
+
+                if (isSentEmail)
+                {
+                    return new UserDTO()
+                    {
+                        UserName = foundUser.UserName,
+                        Email = foundUser.Email,
+                        RoleName = roleResult,
+                        Id = foundUser.Id
+                    };
+                }
+                else
                 {
                     await _userManager.DeleteAsync(foundUser);
+                    throw new ApiException()
+                    {
+                        StatusCode = StatusCodes.Status500InternalServerError,
+                        Title = "Error creating user",
+                        Detail = "User doesn't created"
+                    };
                 }
-
-                return roleResult.Succeeded;
             }
             else
-            {
-                return false;
-            }
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Title = "Error creating user",
+                    Detail = "user was not added due to an error on the server"
+                };
         }
 
         public async Task<User> GetUserById(string id)
@@ -61,7 +97,19 @@ namespace VolunteerAppSecurity.Services
             return await _userManager.FindByIdAsync(id);
         }
 
-        public async Task<bool> SendEmail(User user)
+
+        public async Task<UserDTO> GetUserByEmail(string email)
+        {
+            var user = await _securityDBContext.Users.FirstOrDefaultAsync(i => i.Email == email);
+            return new UserDTO()
+            {
+                Id = user.Id,
+                Email = user.Email,
+                UserName = user.UserName
+            };
+        }
+
+        private async Task<bool> SendEmail(User user)
         {
             var emailConfirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var emailConfirmationUrl = await CallBackUrl(user, emailConfirmationToken);
@@ -227,6 +275,117 @@ namespace VolunteerAppSecurity.Services
             return verificationResult.Succeeded;
         }
 
+        private async Task<string> AddUserRoleAsync(User user, string roleName)
+        {
+            var isAddedUserRole = await _userManager.AddToRoleAsync(user, roleName);
+         
+            if (isAddedUserRole.Succeeded)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                return roles.First();
+            }
+            else
+            { 
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Title = "Error adding role",
+                    Detail = "Role doesn't added"
+                };
+            }
+        }
+
+        public async Task<bool> DeleteUser(string email)
+        {
+            var foundUser = await _userManager.FindByEmailAsync(email);
+            var deletionResult = await _userManager.DeleteAsync(foundUser);
+            return deletionResult.Succeeded;
+        }
+
+        public async Task<AuthenticationResponse> GenerateTokens(string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            return await _tokenGenerator.GenerateTokens(user);
+        }
+
+        public async Task<bool> SendPasswordResetToken(UserDTO userDTO)
+        {
+            var user = new User()
+            {
+                Email = userDTO.Email,
+            };
+
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            var ngrok = Constants.ngrok;
+            var callbackUrl = ngrok + "/api/User/VerifyPasswordResetCode" + $"?userId={userDTO.Id}&code={resetToken}";
+
+            try
+            {
+                var email = new MimeMessage();
+                email.From.Add(MailboxAddress.Parse(Constants.SenderEmail));
+                email.To.Add(MailboxAddress.Parse(user.Email));
+                email.Subject = "Reset Password";
+                email.Body = new TextPart(TextFormat.Html)
+                {
+                    Text = $@"<html lang=""en"">
+                            <head>
+                              <meta charset=""UTF-8"">
+                              <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+                              <title><3</title>
+                            </head>
+                            <body>
+                            <h1> Колись тут буде відновлення паролю <3 </h1>
+                            </body>
+                            </html>
+                    "
+                };
+
+                using var client = new SmtpClient();
+                string mySmptServerAddres = "smtp.gmail.com";
+                int mySmptPort = 587;
+                await client.ConnectAsync(mySmptServerAddres, mySmptPort, SecureSocketOptions.StartTls);
+                await client.AuthenticateAsync(Constants.SenderEmail, Constants.Password);
+
+                await client.SendAsync(email);
+                await client.DisconnectAsync(true);
+                return true;
+            }
+            catch (Exception) { return false; }
+        }
+
+        public async Task<bool> ConfirmPasswordReset(UserDTO userDTO, string password, string newPassword)
+        {
+            var user = new User()
+            {
+                Email = userDTO.Email
+            };
+
+            var result = await _userManager.ResetPasswordAsync(user, password, newPassword);
+            return result.Succeeded;
+        }
+
+        public async Task<bool> CheckPassword(string email, string password)
+        {
+            var userByEmail = await _userManager.FindByEmailAsync(email);
+            return await _userManager.CheckPasswordAsync(userByEmail, password);
+        }
+
+        public async Task<UserDTO> GetUserByName(string name)
+        {
+            var user = await _userManager.FindByNameAsync(name);
+
+            var userRole = await _userManager.GetRolesAsync(user);
+
+            var userDTO = new UserDTO()
+            {
+                UserName = user.UserName,
+                Email = user.Email,
+                RoleName = userRole.FirstOrDefault()
+            };
+
+            return userDTO;
+        }
     }
 
 }

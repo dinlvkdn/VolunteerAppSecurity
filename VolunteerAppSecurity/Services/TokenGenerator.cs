@@ -31,8 +31,8 @@ namespace VolunteerAppSecurity.Services
             ClaimsIdentity identity = new ClaimsIdentity(new[] {
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Role, roles.FirstOrDefault(ClaimTypes.Role))
-
+                new Claim(ClaimTypes.Role, roles.FirstOrDefault(ClaimTypes.Role)),
+                new Claim(ClaimTypes.Name, user.UserName)
             });
 
             var securityToken = handler.CreateToken(new SecurityTokenDescriptor
