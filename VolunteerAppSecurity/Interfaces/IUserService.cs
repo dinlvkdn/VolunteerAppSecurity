@@ -9,7 +9,6 @@ namespace VolunteerAppSecurity.Interfaces
         public Task<UserDTO> CreateUser(RegisterDTO userDTO);
         public Task<UserDTO> GetUserById(string id);
         public Task<UserDTO> GetUserByEmail(string email);
-        public Task<UserDTO> GetUserByName(string name);
         Task<bool> VerifyEmail(UserDTO userDTO, string code);
         public Task<bool> UserExist(string email);
         public Task<bool> DeleteUser(string email);
