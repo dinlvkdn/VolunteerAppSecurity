@@ -8,6 +8,8 @@ using VolunteerAppSecurity.Interfaces;
 using VolunteerAppSecurity.Models;
 using VolunteerAppSecurity.Services;
 using VolunteerAppSecurity.Exceptions;
+using VolunteerAppSecurity.ValidatorsDTO;
+using FluentValidation;
 
 namespace VolunteerAppSecurity
 {
@@ -23,6 +25,12 @@ namespace VolunteerAppSecurity
             {
                 options.Filters.Add(typeof(ExceptionResponseFilter));
             });
+
+            builder.Services.AddValidatorsFromAssemblyContaining<EmailDTOValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<LoginDTOValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<RegisterDTOValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<ResetPasswordDTOValidator>();
+
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
