@@ -10,7 +10,7 @@ using VolunteerAppSecurity.Services;
 
 namespace VolunteerAppSecurity.Controllers
 {
-    [Route("api/[controller]/[action]")]
+    [Route("api/[controller]")]
     [ApiController]
     public class UserController : ControllerBase
     {
@@ -23,7 +23,7 @@ namespace VolunteerAppSecurity.Controllers
             _tokenGenerator = tokenGenerator;
         }
 
-        [HttpPost]
+        [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginDTO userLoginDTO)
         {
@@ -46,7 +46,7 @@ namespace VolunteerAppSecurity.Controllers
             return Ok(token);
         }
 
-        [HttpPost]
+        [HttpPost("register")]
         [AllowAnonymous]
         public async Task<IActionResult> Registration([FromBody] RegisterDTO userRegisterDTO)
         {
@@ -71,7 +71,7 @@ namespace VolunteerAppSecurity.Controllers
                 };
         }
 
-        [HttpGet]
+        [HttpGet("verification")]
         public async Task<IActionResult> VerificationEmail([FromQuery] string userId, [FromQuery] string code)
         {
             if (userId == null || code == null)
@@ -108,7 +108,7 @@ namespace VolunteerAppSecurity.Controllers
         }
 
         [AllowAnonymous]
-        [HttpPost]
+        [HttpPost("token")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDTO refreshTokenDTO)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -161,5 +161,6 @@ namespace VolunteerAppSecurity.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "Server error");
             }
         }
+
     }
 }

@@ -9,6 +9,7 @@ using MailKit.Net.Smtp;
 using Microsoft.EntityFrameworkCore;
 using VolunteerAppSecurity.DataAccess;
 using VolunteerAppSecurity.Exceptions;
+using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 
 namespace VolunteerAppSecurity.Services
 {
@@ -33,10 +34,14 @@ namespace VolunteerAppSecurity.Services
 
             return Task.FromResult(callbackUrl);
         }
-      
-        public async Task<bool> CreateUser(RegisterDTO registerDTO)
+
+        public Task<bool> UserExist(string email)
+            => _securityDBContext.Users.AnyAsync(u => u.Email == email);
+
+        public async Task<UserDTO> CreateUser(RegisterDTO registerDTO)
         {
             var checkByEmail = await UserExist(registerDTO.Email);
+            var checkByUserName = await _securityDBContext.Users.AnyAsync(u => u.UserName == registerDTO.UserName); ;
             if (checkByEmail) 
             {
                 throw new ApiException()
@@ -44,6 +49,15 @@ namespace VolunteerAppSecurity.Services
                     StatusCode = StatusCodes.Status400BadRequest,
                     Title = "User exist",
                     Detail = "User with this email already exists"
+                };
+            }
+            if (checkByUserName)
+            {
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Title = "User exist",
+                    Detail = "User with this username already exists"
                 };
             }
 
@@ -58,7 +72,7 @@ namespace VolunteerAppSecurity.Services
             if (createUserResult.Succeeded)
             {
                 var foundUser = await _userManager.FindByEmailAsync(user.Email);
-                var roleResult = await _userManager.AddToRolesAsync(foundUser, registerDTO.RoleName);
+                var roleResult = await AddUserRoleAsync(foundUser, registerDTO.RoleName);
 
                 var isSentEmail = await SendEmail(foundUser);
 
@@ -88,13 +102,18 @@ namespace VolunteerAppSecurity.Services
                 {
                     StatusCode = StatusCodes.Status500InternalServerError,
                     Title = "Error creating user",
-                    Detail = "user was not added due to an error on the server"
+                    Detail = "User was not added due to an error on the server"
                 };
         }
 
-        public async Task<User> GetUserById(string id)
+        public async Task<UserDTO> GetUserById(string id)
         {
-            return await _userManager.FindByIdAsync(id);
+            var user = await _userManager.FindByIdAsync(id);
+            return new UserDTO()
+            {
+                Id = user.Id,
+                Email = user.Email
+            };
         }
 
 
@@ -268,11 +287,15 @@ namespace VolunteerAppSecurity.Services
             }
         }
 
-        public async Task<bool> VerifyEmail(User user, string token)
+        public async Task<bool> VerifyEmail(UserDTO user, string token)
         {
-            var verificationResult = await _userManager.ConfirmEmailAsync(user, token);
+            var userVerify = new User()
+            {
+                Email = user.Email,
+            };
+            var result = await _userManager.ConfirmEmailAsync(userVerify, token);
 
-            return verificationResult.Succeeded;
+            return result.Succeeded;
         }
 
         private async Task<string> AddUserRoleAsync(User user, string roleName)
@@ -298,6 +321,15 @@ namespace VolunteerAppSecurity.Services
         public async Task<bool> DeleteUser(string email)
         {
             var foundUser = await _userManager.FindByEmailAsync(email);
+            if (foundUser != null)
+            {
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status404NotFound,
+                    Title = "User not found",
+                    Detail = "User not found"
+                };
+            }
             var deletionResult = await _userManager.DeleteAsync(foundUser);
             return deletionResult.Succeeded;
         }
@@ -371,21 +403,6 @@ namespace VolunteerAppSecurity.Services
             return await _userManager.CheckPasswordAsync(userByEmail, password);
         }
 
-        public async Task<UserDTO> GetUserByName(string name)
-        {
-            var user = await _userManager.FindByNameAsync(name);
-
-            var userRole = await _userManager.GetRolesAsync(user);
-
-            var userDTO = new UserDTO()
-            {
-                UserName = user.UserName,
-                Email = user.Email,
-                RoleName = userRole.FirstOrDefault()
-            };
-
-            return userDTO;
-        }
     }
 
 }
