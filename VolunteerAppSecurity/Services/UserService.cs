@@ -93,7 +93,7 @@ namespace VolunteerAppSecurity.Services
                     {
                         StatusCode = StatusCodes.Status500InternalServerError,
                         Title = "Error creating user",
-                        Detail = "User doesn't created"
+                        Detail = "Failed to send email notification."
                     };
                 }
             }
