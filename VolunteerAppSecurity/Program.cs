@@ -10,6 +10,7 @@ using VolunteerAppSecurity.Services;
 using VolunteerAppSecurity.Exceptions;
 using VolunteerAppSecurity.ValidatorsDTO;
 using FluentValidation;
+using Serilog;
 
 namespace VolunteerAppSecurity
 {
@@ -86,6 +87,9 @@ namespace VolunteerAppSecurity
                 });
 
 
+            builder.Host.UseSerilog((context, configuration) =>
+                configuration.ReadFrom.Configuration(context.Configuration));
+
 
             var app = builder.Build();
 
@@ -95,9 +99,16 @@ namespace VolunteerAppSecurity
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+            else
+            {
+                app.UseExceptionHandler("/Error");
+            }
 
             app.UseRouting();
             app.UseCors("AllowMyOrigins");
+
+            app.UseSerilogRequestLogging();
+
 
             app.UseHttpsRedirection();
 
