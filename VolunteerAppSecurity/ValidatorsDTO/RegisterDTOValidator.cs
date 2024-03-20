@@ -15,10 +15,6 @@ namespace VolunteerAppSecurity.ValidatorsDTO
             RuleFor(u => u.Password)
                 .NotEmpty()
                 .WithMessage("This field is required");
-
-            RuleFor(u => u.UserName)
-                .NotEmpty()
-                .WithMessage("This field is required");
         }
     }
 }

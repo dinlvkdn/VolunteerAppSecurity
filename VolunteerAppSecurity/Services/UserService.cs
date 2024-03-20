@@ -41,7 +41,6 @@ namespace VolunteerAppSecurity.Services
         public async Task<UserDTO> CreateUser(RegisterDTO registerDTO)
         {
             var checkByEmail = await UserExist(registerDTO.Email);
-            var checkByUserName = await _securityDBContext.Users.AnyAsync(u => u.UserName == registerDTO.UserName); ;
             if (checkByEmail) 
             {
                 throw new ApiException()
@@ -51,19 +50,9 @@ namespace VolunteerAppSecurity.Services
                     Detail = "User with this email already exists"
                 };
             }
-            if (checkByUserName)
-            {
-                throw new ApiException()
-                {
-                    StatusCode = StatusCodes.Status400BadRequest,
-                    Title = "User exist",
-                    Detail = "User with this username already exists"
-                };
-            }
-
+      
             var user = new User()
             {
-                UserName = registerDTO.UserName,
                 Email = registerDTO.Email
             };
 
