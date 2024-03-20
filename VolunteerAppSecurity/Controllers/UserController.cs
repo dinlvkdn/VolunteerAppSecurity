@@ -18,7 +18,7 @@ namespace VolunteerAppSecurity.Controllers
         readonly ITokenGenerator _tokenGenerator;
 
         public UserController(IUserService userService, ITokenGenerator tokenGenerator)
-        { 
+        {
             _userService = userService;
             _tokenGenerator = tokenGenerator;
         }
@@ -42,7 +42,7 @@ namespace VolunteerAppSecurity.Controllers
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, "Error occured while creating user on server");
             }
-            
+
             return Ok(token);
         }
 
@@ -60,7 +60,7 @@ namespace VolunteerAppSecurity.Controllers
 
             var createdUser = await _userService.CreateUser(userRegisterDTO);
 
-            if (createdUser != null) 
+            if (createdUser != null)
                 return Created("/api/user", createdUser);
             else
                 throw new ApiException()
@@ -77,7 +77,7 @@ namespace VolunteerAppSecurity.Controllers
             if (userId == null || code == null)
                 return BadRequest(new AuthResponse()
                 {
-                    Errors = new List<string>() {"Invalid email confirmation url"},
+                    Errors = new List<string>() { "Invalid email confirmation url" },
                     Result = false
                 });
 
@@ -162,5 +162,25 @@ namespace VolunteerAppSecurity.Controllers
             }
         }
 
+        [Authorize]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteUser([FromQuery] Guid userId)
+        {
+            var deletedUser = await _userService.DeleteUserById(userId);
+
+            if (deletedUser)
+            {
+                return Ok();
+            }
+            else
+            {
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Title = "Server error",
+                    Detail = "Error occured while creating user on server"
+                };
+            }
+        }
     }
 }

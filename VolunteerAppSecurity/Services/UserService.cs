@@ -53,6 +53,7 @@ namespace VolunteerAppSecurity.Services
       
             var user = new User()
             {
+                UserName = registerDTO.Email,
                 Email = registerDTO.Email
             };
 
@@ -69,7 +70,6 @@ namespace VolunteerAppSecurity.Services
                 {
                     return new UserDTO()
                     {
-                        UserName = foundUser.UserName,
                         Email = foundUser.Email,
                         RoleName = roleResult,
                         Id = foundUser.Id
@@ -105,7 +105,6 @@ namespace VolunteerAppSecurity.Services
             };
         }
 
-
         public async Task<UserDTO> GetUserByEmail(string email)
         {
             var user = await _securityDBContext.Users.FirstOrDefaultAsync(i => i.Email == email);
@@ -113,7 +112,6 @@ namespace VolunteerAppSecurity.Services
             {
                 Id = user.Id,
                 Email = user.Email,
-                UserName = user.UserName
             };
         }
 
@@ -323,6 +321,24 @@ namespace VolunteerAppSecurity.Services
             return deletionResult.Succeeded;
         }
 
+        public async Task<bool> DeleteUserById(Guid id)
+        {
+            string userId = id.ToString();
+            var foundUser = await _userManager.FindByIdAsync(userId);
+
+            if (foundUser == null)
+            {
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status404NotFound,
+                    Title = "User not found",
+                    Detail = "User not found"
+                };
+            }
+            var deletionResult = await _userManager.DeleteAsync(foundUser);
+            return deletionResult.Succeeded;
+        }
+
         public async Task<AuthenticationResponse> GenerateTokens(string email)
         {
             var user = await _userManager.FindByEmailAsync(email);
@@ -391,6 +407,8 @@ namespace VolunteerAppSecurity.Services
             var userByEmail = await _userManager.FindByEmailAsync(email);
             return await _userManager.CheckPasswordAsync(userByEmail, password);
         }
+
+
 
     }
 

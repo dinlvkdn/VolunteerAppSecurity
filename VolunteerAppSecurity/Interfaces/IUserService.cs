@@ -12,6 +12,7 @@ namespace VolunteerAppSecurity.Interfaces
         Task<bool> VerifyEmail(UserDTO userDTO, string code);
         public Task<bool> UserExist(string email);
         public Task<bool> DeleteUser(string email);
+        public Task<bool> DeleteUserById(Guid id);
         public Task<AuthenticationResponse> GenerateTokens(string email);
         Task<bool> SendPasswordResetToken(UserDTO userDTO);
         Task<bool> ConfirmPasswordReset(UserDTO userDTO, string password, string newPassword);
