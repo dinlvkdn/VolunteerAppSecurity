@@ -34,8 +34,16 @@ namespace VolunteerAppSecurity.Controllers
 
             var checkPassword = await _userService.CheckPassword(userLoginDTO.Email, userLoginDTO.Password);
 
-            if (!checkPassword) return BadRequest("Incorrect password!");
-
+            if (!checkPassword)
+            {
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Title = "Incorrect password!",
+                    Detail = "Incorrect password!"
+                };
+            }
+           
             var token = await _userService.GenerateTokens(userLoginDTO.Email);
 
             if (token == null)
@@ -99,12 +107,10 @@ namespace VolunteerAppSecurity.Controllers
 
             if (await _userService.VerifyEmail(user, code))
             {
-                return Content(Constants.SuccessMessage, "text/html");
+                return Redirect("http://localhost:4200/signin");
             }
-            else
-            {
-                return Content(Constants.FailureMessage, "text/html");
-            }
+         
+            return Redirect("http://localhost:4200/signup");
         }
 
         [AllowAnonymous]
