@@ -11,6 +11,7 @@ using VolunteerAppSecurity.DataAccess;
 using VolunteerAppSecurity.Exceptions;
 using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 using VolunteerAppSecurity.Helpers;
+using VolunteerAppSecurity.Models.Enums;
 
 namespace VolunteerAppSecurity.Services
 {
@@ -155,9 +156,9 @@ namespace VolunteerAppSecurity.Services
             return result.Succeeded;
         }
 
-        private async Task<string> AddUserRoleAsync(User user, string roleName)
+        private async Task<string> AddUserRoleAsync(User user, Role roleName)
         {
-            var isAddedUserRole = await _userManager.AddToRoleAsync(user, roleName);
+            var isAddedUserRole = await _userManager.AddToRoleAsync(user, roleName.ToString());
          
             if (isAddedUserRole.Succeeded)
             {
