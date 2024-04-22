@@ -1,47 +1,51 @@
-﻿using Org.BouncyCastle.Bcpg;
+﻿using Microsoft.AspNetCore.Identity;
+using Org.BouncyCastle.Bcpg;
 using VolunteerAppSecurity.DataAccess;
 using VolunteerAppSecurity.Models;
+using VolunteerAppSecurity.Models.Enums;
 
 namespace VolunteerAppSecurity
 {
     public class DataSeeder
     {
-        private readonly SecurityDBContext  _dbContext;
+        private readonly UserManager<User> _userManager;
+        private readonly RoleManager<IdentityRole<Guid>> _roleManager;
 
-        public DataSeeder(SecurityDBContext dbContext)
+        public DataSeeder(UserManager<User> userManager, RoleManager<IdentityRole<Guid>> roleManager)
         {
-            _dbContext = dbContext;
+            _userManager = userManager;
+            _roleManager = roleManager;
         }
 
-        public void Seed()
+        public async Task SeedRoles()
         {
-            if(!_dbContext.Users.Any()) 
-            {
-                var user = new List<User>()
-                {
-                    new User()
-                    {
-                        Id = new Guid("78ae91f4-6d5e-40cc-bc60-e27e84219661"),
-                        UserName = "nalivaykodiana@gmail.com",
-                        Email = "nalivaykodiana@gmail.com"
-                    },
-                    new User()
-                    {
-                        Id = new Guid("78ae91f4-6d5e-40cc-bc60-e27e84219662"),
-                        UserName = "nalivaykodiana@gmail.com",
-                        Email = "nalivaykodiana@gmail.com"
-                    },
-                     new User()
-                    {
-                         Id = new Guid("78ae91f4-6d5e-40cc-bc60-e27e84219663"),
-                        UserName = "nalivaykodiana@gmail.com",
-                        Email = "nalivaykodiana@gmail.com"
-                    }
-                };
-                _dbContext.Users.AddRange(user);
-                _dbContext.SaveChanges();
-            }
+            if (!await _roleManager.RoleExistsAsync(Role.Admin.ToString()))
+                await _roleManager.CreateAsync(new IdentityRole<Guid>(Role.Admin.ToString()));
+        }
 
-        }    
+        public async Task SeedAdmins()
+        {
+            var adminId = Guid.NewGuid();
+
+            string email = "nlvkdn911@yopmail.com";
+            string password = "Diana2004*";
+
+            if (await _userManager.FindByIdAsync(adminId.ToString()) == null)
+            {
+                var admin = new User()
+                {
+                    Id = adminId,
+                    UserName = email,
+                    Email = email,
+                };
+
+                var result = await _userManager.CreateAsync(admin, password);
+
+                if (result.Succeeded)
+                {
+                    await _userManager.AddToRoleAsync(admin, Role.Admin.ToString());
+                }
+            }
+        }  
     }
 }

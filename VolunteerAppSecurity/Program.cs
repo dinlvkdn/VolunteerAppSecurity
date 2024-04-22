@@ -102,7 +102,7 @@ namespace VolunteerAppSecurity
                 using (var scope = scopedFactory.CreateScope())
                 {
                     var service = scope.ServiceProvider.GetService<DataSeeder>();
-                    service.Seed();
+                    service.SeedAdmins();
                 }
             }
 
