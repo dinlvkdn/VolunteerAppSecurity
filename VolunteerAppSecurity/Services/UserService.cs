@@ -176,22 +176,6 @@ namespace VolunteerAppSecurity.Services
             }
         }
 
-        public async Task<bool> DeleteUser(string email)
-        {
-            var foundUser = await _userManager.FindByEmailAsync(email);
-            if (foundUser != null)
-            {
-                throw new ApiException()
-                {
-                    StatusCode = StatusCodes.Status404NotFound,
-                    Title = "User not found",
-                    Detail = "User not found"
-                };
-            }
-            var deletionResult = await _userManager.DeleteAsync(foundUser);
-            return deletionResult.Succeeded;
-        }
-
         public async Task<bool> DeleteUserById(Guid id)
         {
             string userId = id.ToString();
@@ -214,53 +198,6 @@ namespace VolunteerAppSecurity.Services
         {
             var user = await _userManager.FindByEmailAsync(email);
             return await _tokenGenerator.GenerateTokens(user);
-        }
-
-        public async Task<bool> SendPasswordResetToken(UserDTO userDTO)
-        {
-            var user = new User()
-            {
-                Email = userDTO.Email,
-            };
-
-            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-
-            var ngrok = Constants.ngrok;
-            var callbackUrl = ngrok + "/api/User/VerifyPasswordResetCode" + $"?userId={userDTO.Id}&code={resetToken}";
-
-            try
-            {
-                var email = new MimeMessage();
-                email.From.Add(MailboxAddress.Parse(Constants.SenderEmail));
-                email.To.Add(MailboxAddress.Parse(user.Email));
-                email.Subject = "Reset Password";
-                email.Body = new TextPart(TextFormat.Html)
-                {
-                    Text = EmailTemplateGenerator.ResetPassword(Constants.SignInURL)
-                };
-
-                using var client = new SmtpClient();
-                string mySmptServerAddres = "smtp.gmail.com";
-                int mySmptPort = 587;
-                await client.ConnectAsync(mySmptServerAddres, mySmptPort, SecureSocketOptions.StartTls);
-                await client.AuthenticateAsync(Constants.SenderEmail, Constants.Password);
-
-                await client.SendAsync(email);
-                await client.DisconnectAsync(true);
-                return true;
-            }
-            catch (Exception) { return false; }
-        }
-
-        public async Task<bool> ConfirmPasswordReset(UserDTO userDTO, string password, string newPassword)
-        {
-            var user = new User()
-            {
-                Email = userDTO.Email
-            };
-
-            var result = await _userManager.ResetPasswordAsync(user, password, newPassword);
-            return result.Succeeded;
         }
 
         public async Task<bool> CheckPassword(string email, string password)

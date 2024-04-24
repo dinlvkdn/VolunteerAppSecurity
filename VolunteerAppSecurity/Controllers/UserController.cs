@@ -58,13 +58,7 @@ namespace VolunteerAppSecurity.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Registration([FromBody] RegisterDTO userRegisterDTO)
         {
-            if (!ModelState.IsValid)
-                throw new ApiException()
-                {
-                    StatusCode = StatusCodes.Status404NotFound,
-                    Title = "Not found",
-                    Detail = "User doesn't exist"
-                };
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var createdUser = await _userService.CreateUser(userRegisterDTO);
 
@@ -125,47 +119,6 @@ namespace VolunteerAppSecurity.Controllers
             if (result == null) return StatusCode(StatusCodes.Status400BadRequest);
 
             return Ok(result);
-        }
-
-        [AllowAnonymous]
-        [HttpPost("resetcode")]
-        public async Task<IActionResult> ResettingCode([FromBody] EmailDTO emailDTO)
-        {
-            var id = HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var user = await _userService.UserExist(emailDTO.To);
-
-            if (!user) return BadRequest("User doesn't exists");
-
-            var userGetResetCode = await _userService.GetUserById(id);
-
-            if (await _userService.SendPasswordResetToken(userGetResetCode))
-            {
-                return Ok("Reset code has sent!");
-            }
-            else
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, "Server error");
-            }
-        }
-
-        [AllowAnonymous]
-        [HttpPost("verifyresetcode")]
-        public async Task<IActionResult> VerifyingResetCode([FromBody] ResetPasswordDTO resetPasswordDTO)
-        {
-            if (!await _userService.UserExist(resetPasswordDTO.Email))
-            {
-                return BadRequest("Invalid email or doesn't exists");
-            }
-
-            var user = await _userService.GetUserByEmail(resetPasswordDTO.Email);
-            if (await _userService.ConfirmPasswordReset(user, resetPasswordDTO.ResetCode, resetPasswordDTO.NewPassword))
-            {
-                return Ok("Password reset successfully");
-            }
-            else
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, "Server error");
-            }
         }
 
         [Authorize]
