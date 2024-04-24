@@ -20,8 +20,6 @@ namespace VolunteerAppSecurity
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
-
             builder.Services.AddControllers(options =>
             {
                 options.Filters.Add(typeof(ExceptionResponseFilter));
@@ -30,9 +28,7 @@ namespace VolunteerAppSecurity
             builder.Services.AddValidatorsFromAssemblyContaining<EmailDTOValidator>();
             builder.Services.AddValidatorsFromAssemblyContaining<LoginDTOValidator>();
             builder.Services.AddValidatorsFromAssemblyContaining<RegisterDTOValidator>();
-            builder.Services.AddValidatorsFromAssemblyContaining<ResetPasswordDTOValidator>();
 
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
@@ -106,7 +102,6 @@ namespace VolunteerAppSecurity
                 }
             }
 
-            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -142,7 +137,6 @@ namespace VolunteerAppSecurity
                         await roleManager.CreateAsync(new IdentityRole<Guid>(role));
                 }
             }
-
 
             app.Run();
         }
