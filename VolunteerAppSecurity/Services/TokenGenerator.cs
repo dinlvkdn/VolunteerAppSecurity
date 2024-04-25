@@ -41,7 +41,7 @@ namespace VolunteerAppSecurity.Services
                 Audience = _authSettings.Audience,
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
                 Subject = identity,
-                Expires = DateTime.Now.AddHours(_authSettings.AccessTokenExpirationMinutes)
+                Expires = DateTime.Now.AddMinutes(_authSettings.AccessTokenExpirationMinutes)
             });
             return handler.WriteToken(securityToken);
         }
