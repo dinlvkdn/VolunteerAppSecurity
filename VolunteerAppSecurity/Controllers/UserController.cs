@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using VolunteerAppSecurity.DTOs;
+using VolunteerAppSecurity.Exceptions;
 using VolunteerAppSecurity.Interfaces;
 using VolunteerAppSecurity.Models;
 using VolunteerAppSecurity.Services;
@@ -14,66 +16,70 @@ namespace VolunteerAppSecurity.Controllers
     {
         readonly IUserService _userService;
         readonly ITokenGenerator _tokenGenerator;
-        readonly UserManager<User> _userManager;
 
-        public UserController(IUserService userService, ITokenGenerator tokenGenerator, UserManager<User> userManager)
+        public UserController(IUserService userService, ITokenGenerator tokenGenerator)
         {
             _userService = userService;
             _tokenGenerator = tokenGenerator;
-            _userManager = userManager;
         }
 
-        [HttpPost]
+        [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginDTO userLoginDTO)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var user = await _userManager.FindByEmailAsync(userLoginDTO.Email);
+            var user = await _userService.UserExist(userLoginDTO.Email);
+            if (!user) return NotFound("No user exists");
 
-            if (user == null) return NotFound("No user exists");
+            var checkPassword = await _userService.CheckPassword(userLoginDTO.Email, userLoginDTO.Password);
 
-            var token = await _tokenGenerator.GenerateTokens(user);
+            if (!checkPassword)
+            {
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Title = "Incorrect password!",
+                    Detail = "Incorrect password!"
+                };
+            }
+           
+            var token = await _userService.GenerateTokens(userLoginDTO.Email);
 
             if (token == null)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, "Error occured while creating user on server");
             }
-            
+
             return Ok(token);
         }
 
-        [HttpPost]
+        [HttpPost("register")]
         [AllowAnonymous]
         public async Task<IActionResult> Registration([FromBody] RegisterDTO userRegisterDTO)
         {
-            try
-            {
-                if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
-                var user = await _userManager.FindByEmailAsync(userRegisterDTO.Email);
-                var isUserExists = await _userService.UserExist(userRegisterDTO.Email);
+            var createdUser = await _userService.CreateUser(userRegisterDTO);
 
-                if (isUserExists)
+            if (createdUser != null)
+                return Created("/api/user", createdUser);
+            else
+                throw new ApiException()
                 {
-                    return BadRequest("A user with this email already exists");
-                }
-                var createdUser = await _userService.CreateUser(userRegisterDTO);
-                if (createdUser != null) return Created("/api/user", user);
-
-            }
-            catch (Exception) { }
-
-            return StatusCode(StatusCodes.Status500InternalServerError, "Error occured while creating user on server");
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Title = "Server error",
+                    Detail = "Error occured while creating user on server"
+                };
         }
 
-        [HttpGet]
+        [HttpGet("verification")]
         public async Task<IActionResult> VerificationEmail([FromQuery] string userId, [FromQuery] string code)
         {
             if (userId == null || code == null)
                 return BadRequest(new AuthResponse()
                 {
-                    Errors = new List<string>() {"Invalid email confirmation url"},
+                    Errors = new List<string>() { "Invalid email confirmation url" },
                     Result = false
                 });
 
@@ -95,11 +101,44 @@ namespace VolunteerAppSecurity.Controllers
 
             if (await _userService.VerifyEmail(user, code))
             {
-                return Content(Constants.SuccessMessage, "text/html");
+                return Redirect("http://localhost:4200/signin");
+            }
+         
+            return Redirect("http://localhost:4200/signup");
+        }
+
+        [AllowAnonymous]
+        [HttpPost("token")]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDTO refreshTokenDTO)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var result = await _tokenGenerator.RefreshAccessToken(refreshTokenDTO.AccessToken,
+                refreshTokenDTO.RefreshToken);
+
+            if (result == null) return StatusCode(StatusCodes.Status400BadRequest);
+
+            return Ok(result);
+        }
+
+        [Authorize]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteUser([FromQuery] Guid userId)
+        {
+            var deletedUser = await _userService.DeleteUserById(userId);
+
+            if (deletedUser)
+            {
+                return Ok();
             }
             else
             {
-                return Content(Constants.FailureMessage, "text/html");
+                throw new ApiException()
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Title = "Server error",
+                    Detail = "Error occured while creating user on server"
+                };
             }
         }
     }

@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +7,10 @@ using VolunteerAppSecurity.DataAccess;
 using VolunteerAppSecurity.Interfaces;
 using VolunteerAppSecurity.Models;
 using VolunteerAppSecurity.Services;
+using VolunteerAppSecurity.Exceptions;
+using VolunteerAppSecurity.ValidatorsDTO;
+using FluentValidation;
+using Serilog;
 
 namespace VolunteerAppSecurity
 {
@@ -17,10 +20,15 @@ namespace VolunteerAppSecurity
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
+            builder.Services.AddControllers(options =>
+            {
+                options.Filters.Add(typeof(ExceptionResponseFilter));
+            });
 
-            builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+            builder.Services.AddValidatorsFromAssemblyContaining<EmailDTOValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<LoginDTOValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<RegisterDTOValidator>();
+
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
@@ -75,18 +83,40 @@ namespace VolunteerAppSecurity
                 });
 
 
+            builder.Host.UseSerilog((context, configuration) =>
+                configuration.ReadFrom.Configuration(context.Configuration));
+
 
             var app = builder.Build();
+            if (args.Length == 1 && args[0].ToLower() == "seeddata")
+                SeedData(app);
 
-            // Configure the HTTP request pipeline.
+            void SeedData(IHost app)
+            {
+                var scopedFactory = app.Services.GetService<IServiceScopeFactory>();
+
+                using (var scope = scopedFactory.CreateScope())
+                {
+                    var service = scope.ServiceProvider.GetService<DataSeeder>();
+                    service.SeedAdmins();
+                }
+            }
+
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+            else
+            {
+                app.UseExceptionHandler("/Error");
+            }
 
             app.UseRouting();
             app.UseCors("AllowMyOrigins");
+
+            app.UseSerilogRequestLogging();
+
 
             app.UseHttpsRedirection();
 
@@ -107,7 +137,6 @@ namespace VolunteerAppSecurity
                         await roleManager.CreateAsync(new IdentityRole<Guid>(role));
                 }
             }
-
 
             app.Run();
         }
